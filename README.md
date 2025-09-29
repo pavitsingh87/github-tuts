@@ -21,7 +21,7 @@ Open the app in your browser:
 
 ```
 
-[http://localhost:8000](http://localhost:8000)
+https://0f46d6695d26.ngrok-free.app/
 
 ````
 
