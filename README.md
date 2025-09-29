@@ -1,8 +1,3 @@
-# Absolutely! Here's a **complete README.md** for your `openai_chat` project, combining everything we discussed, fully formatted and ready for GitHub:
-
----
-
-```markdown
 # OpenAI Finance Chat Agent
 
 A **FastAPI-based AI chatbot** that only answers finance-related queries, powered by **LangChain** and **OpenAI GPT-4o-mini**. Users can interact with the bot through a simple web interface, and the bot integrates **SerpAPI** for finance-related web search results.
