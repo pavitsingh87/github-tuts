@@ -1,140 +1,73 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-import os
-from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from customer_routes import router as customer_router
+from employee_routes import router as employee_router
 
-from langchain_openai import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
-from langchain.agents import initialize_agent, Tool
-from langchain_community.utilities import SerpAPIWrapper
+app = FastAPI(title="Finance Support System", version="1.0.0")
 
-load_dotenv()
-
-app = FastAPI()
-
-# ==================
-# Environment Variables
-# ==================
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
-
-# ==================
-# Chat Model + Memory
-# ==================
-llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=OPENAI_API_KEY)
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
-# ==================
-# Tools
-# ==================
-search = SerpAPIWrapper(serpapi_api_key=SERPAPI_API_KEY)
-tools = [
-    Tool(
-        name="Search",
-        func=search.run,
-        description="Useful for answering finance questions from the internet"
-    )
-]
-
-# ==================
-# Agent Initialization
-# ==================
-agent = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent="conversational-react-description",
-    memory=memory,
-    verbose=True
-)
-
-# ==================
-# Finance Filtering
-# ==================
-finance_keywords = ["finance", "investment", "stock", "bank", "loan", "mortgage", "money"]
-
-def is_finance_question(question: str) -> bool:
-    return any(word in question.lower() for word in finance_keywords)
-
-# ==================
-# API Endpoint
-# ==================
-@app.post("/chat")
-async def chat_endpoint(request: Request):
-    body = await request.json()
-    user_message = body.get("message", "").strip()
-
-    if not is_finance_question(user_message):
-        return JSONResponse({"response": "I am a finance assistant and can only answer finance-related queries."})
-
-    # Pass finance question to LangChain agent
-    response = agent.run(user_message)
-    return JSONResponse({"response": response})
-
-# ==================
-# UI Endpoint
-# ==================
+# Landing page to direct users to appropriate portals
 @app.get("/", response_class=HTMLResponse)
-async def chat_ui():
+async def landing_page():
     return """
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>AI Finance Agent Chat</title>
+        <title>Finance Support System</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
-            body { background-color: #f8f9fa; }
-            #chat-box {
-                border: 1px solid #ced4da;
-                border-radius: 8px;
-                padding: 15px;
-                height: 400px;
-                overflow-y: auto;
-                background-color: #ffffff;
-            }
-            .user { color: #0d6efd; margin: 5px 0; }
-            .bot { color: #198754; margin: 5px 0; }
-            .chat-input-group { position: sticky; bottom: 0; background: #f8f9fa; padding-top: 10px; }
+            .hero-section { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; min-height: 100vh; }
+            .portal-card { transition: transform 0.3s; cursor: pointer; }
+            .portal-card:hover { transform: translateY(-10px); }
         </style>
     </head>
     <body>
-        <div class="container py-4">
-            <h2 class="text-center mb-4">AI Finance Agent Chat</h2>
-            <div id="chat-box" class="mb-3 shadow-sm"></div>
-            <div class="input-group chat-input-group">
-                <input id="message" type="text" class="form-control" placeholder="Type a finance question...">
-                <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+        <div class="hero-section d-flex align-items-center">
+            <div class="container">
+                <div class="row justify-content-center text-center">
+                    <div class="col-md-10">
+                        <h1 class="display-3 mb-4">Finance Support System</h1>
+                        <p class="lead mb-5">Choose your portal to get started</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <div class="card portal-card shadow-lg h-100" onclick="window.location.href='/customer'">
+                                    <div class="card-body p-5 text-dark">
+                                        <i class="fas fa-user-circle fa-4x text-primary mb-4"></i>
+                                        <h3 class="card-title">Customer Portal</h3>
+                                        <p class="card-text">Get finance support, chat with AI assistant, or connect with support agents</p>
+                                        <div class="btn btn-primary btn-lg">Enter Customer Portal</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <div class="card portal-card shadow-lg h-100" onclick="window.location.href='/employee'">
+                                    <div class="card-body p-5 text-dark">
+                                        <i class="fas fa-user-tie fa-4x text-success mb-4"></i>
+                                        <h3 class="card-title">Employee Portal</h3>
+                                        <p class="card-text">Access staff dashboard, manage support queue, and assist customers</p>
+                                        <div class="btn btn-success btn-lg">Enter Employee Portal</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <script>
-            async function sendMessage() {
-                const msg = document.getElementById("message").value.trim();
-                if (!msg) return;
-
-                let chatBox = document.getElementById("chat-box");
-                chatBox.innerHTML += `<div class='user'><b>You:</b> ${msg}</div>`;
-
-                try {
-                    const res = await fetch("/chat", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ message: msg })
-                    });
-                    const data = await res.json();
-                    chatBox.innerHTML += `<div class='bot'><b>AI:</b> ${data.response}</div>`;
-                } catch (err) {
-                    chatBox.innerHTML += `<div class='bot text-danger'><b>AI:</b> Error connecting to server</div>`;
-                }
-
-                chatBox.scrollTop = chatBox.scrollHeight;
-                document.getElementById("message").value = "";
-            }
-
-            document.getElementById("message").addEventListener("keypress", function(e) {
-                if (e.key === "Enter") sendMessage();
-            });
-        </script>
+        
+        <script src="https://kit.fontawesome.com/your-fontawesome-kit.js"></script>
     </body>
     </html>
     """
+
+# Include customer routes under /customer prefix
+app.include_router(customer_router, prefix="/customer")
+
+# Include employee routes under /employee prefix  
+app.include_router(employee_router, prefix="/employee")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
